@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geth-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geth
+  template:
+    metadata:
+      labels:
+        app: geth
+    spec:
+      containers:
+      - name: geth
+        image: gcr.io/health-hero-bot/mygeth-node:latest 
+        ports:
+        - containerPort: 8545 
+        - containerPort: 8546 
+        - containerPort: 30303
