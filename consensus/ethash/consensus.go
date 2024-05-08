@@ -650,41 +650,84 @@ func (ethash *Ethash) SealHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
-var (
-    maxTotalRewards = big.NewInt(1e18) // This should be set to 1 billion ETH in wei (just an example)
-    totalRewardsDistributed = big.NewInt(0) // This needs to be persisted and updated with each block
-)
 
 // Some weird constants to avoid constant memory allocs for them.
 var (
 	big8  = big.NewInt(8)
 	big32 = big.NewInt(32)
-)
+)	
 
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
-	// Select the correct block reward based on chain progression
-	blockReward := FrontierBlockReward
-	if config.IsByzantium(header.Number) {
-		blockReward = ByzantiumBlockReward
-	}
-	if config.IsConstantinople(header.Number) {
-		blockReward = ConstantinopleBlockReward
-	}
-	// Accumulate the rewards for the miner and any included uncles
-	reward := new(big.Int).Set(blockReward)
-	r := new(big.Int)
-	for _, uncle := range uncles {
-		r.Add(uncle.Number, big8)
-		r.Sub(r, header.Number)
-		r.Mul(r, blockReward)
-		r.Div(r, big8)
-		state.AddBalance(uncle.Coinbase, r)
+// func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
+// 	// Select the correct block reward based on chain progression
+// 	blockReward := FrontierBlockReward
+// 	if config.IsByzantium(header.Number) {
+// 		blockReward = ByzantiumBlockReward
+// 	}
+// 	if config.IsConstantinople(header.Number) {
+// 		blockReward = ConstantinopleBlockReward
+// 	}
+// 	// Accumulate the rewards for the miner and any included uncles
+// 	reward := new(big.Int).Set(blockReward)
+// 	r := new(big.Int)
+// 	for _, uncle := range uncles {
+// 		r.Add(uncle.Number, big8)
+// 		r.Sub(r, header.Number)
+// 		r.Mul(r, blockReward)
+// 		r.Div(r, big8)
+// 		state.AddBalance(uncle.Coinbase, r)
 
-		r.Div(blockReward, big32)
-		reward.Add(reward, r)
-	}
-	state.AddBalance(header.Coinbase, reward)
+// 		r.Div(blockReward, big32)
+// 		reward.Add(reward, r)
+// 	}
+// 	state.AddBalance(header.Coinbase, reward)
+// }
+
+
+// AccumulateRewards credits the coinbase of the given block with the mining
+// reward. The total reward consists of the static block reward and rewards for
+// included uncles. The coinbase of each uncle block is also rewarded.
+var (
+    maxTotalRewards = big.NewInt(1e18) // Maximum rewards in (Wei)
+    totalRewardsDistributed = big.NewInt(0) // Initialize to zero
+)
+
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
+    // Define block rewards based on the block's era
+    blockReward := big.NewInt(0)
+    switch {
+    case config.IsConstantinople(header.Number):
+        blockReward = ConstantinopleBlockReward
+    case config.IsByzantium(header.Number):
+        blockReward = ByzantiumBlockReward
+    default:
+        blockReward = FrontierBlockReward
+    }
+
+    // Calculate total reward for the block including uncle rewards
+    totalBlockReward := new(big.Int).Set(blockReward)
+    for _, uncle := range uncles {
+        r := new(big.Int)
+        r.Add(uncle.Number, big.NewInt(8))
+        r.Sub(r, header.Number)
+        r.Mul(r, blockReward)
+        r.Div(r, big.NewInt(8))
+        state.AddBalance(uncle.Coinbase, r)
+
+        r.Div(blockReward, big.NewInt(32))
+        totalBlockReward.Add(totalBlockReward, r)
+    }
+
+    // Check and update the total rewards distributed
+    newTotal := new(big.Int).Add(totalRewardsDistributed, totalBlockReward)
+    if newTotal.Cmp(maxTotalRewards) <= 0 {
+        state.AddBalance(header.Coinbase, totalBlockReward)
+        totalRewardsDistributed.Add(totalRewardsDistributed, totalBlockReward)
+    } else {
+        remainingReward := new(big.Int).Sub(maxTotalRewards, totalRewardsDistributed)
+        state.AddBalance(header.Coinbase, remainingReward)
+        totalRewardsDistributed.Set(maxTotalRewards)
+    }
 }

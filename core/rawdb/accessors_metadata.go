@@ -27,6 +27,23 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+
+//WriteTotalRewardsDistributed to write the total reward distributed
+func WriteTotalRewardsDistributed(db ethdb.KeyValueWriter, total *big.Int) {
+    key := []byte("totalRewardsDistributed")
+    val := total.Bytes()
+    db.Put(key, val)
+}
+
+//ReadTotalRewardsDistributed To read total reward distributed from database
+func ReadTotalRewardsDistributed(db ethdb.KeyValueReader) *big.Int {
+    key := []byte("totalRewardsDistributed")
+    if data, _ := db.Get(key); data != nil {
+        return new(big.Int).SetBytes(data)
+    }
+    return new(big.Int) //return 0 if not found, => for the genesis block
+}
+
 // ReadDatabaseVersion retrieves the version number of the database.
 func ReadDatabaseVersion(db ethdb.KeyValueReader) *uint64 {
 	var version uint64
@@ -66,6 +83,7 @@ func ReadChainConfig(db ethdb.KeyValueReader, hash common.Hash) *params.ChainCon
 	}
 	return &config
 }
+
 
 // WriteChainConfig writes the chain config settings to the database.
 func WriteChainConfig(db ethdb.KeyValueWriter, hash common.Hash, cfg *params.ChainConfig) {

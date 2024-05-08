@@ -373,7 +373,7 @@ func (s *stateObject) commitTrie(db Database) (*trie.NodeSet, error) {
 
 func (s *stateObject) AddBalance(amount *big.Int) {
     newTotal := new(big.Int).Add(s.db.totalRewardsDistributed, amount)
-    cap := new(big.Int).SetUint64(1000000000)
+    cap := new(big.Int).SetUint64(1000000000) 
 
     if newTotal.Cmp(cap) <= 0 {
         s.SetBalance(new(big.Int).Add(s.Balance(), amount))
@@ -384,6 +384,7 @@ func (s *stateObject) AddBalance(amount *big.Int) {
         s.db.totalRewardsDistributed.Set(cap)
     }
 }
+
 
 // func (s *stateObject) AddBalance(amount *big.Int) {
 // 	// EIP161: We must check emptiness for the objects such that the account

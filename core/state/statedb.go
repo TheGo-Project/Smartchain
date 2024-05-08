@@ -154,6 +154,7 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
         accessList:             newAccessList(),
         transientStorage:       newTransientStorage(),
         hasher:                 crypto.NewKeccakState(),
+
         totalRewardsDistributed: big.NewInt(0), // Initialize as zero
     }
     if sdb.snaps != nil {
@@ -400,12 +401,32 @@ func (s *StateDB) HasSuicided(addr common.Address) bool {
  */
 
 // AddBalance adds amount to the account associated with addr.
+// func (s *StateDB) AddBalance(addr common.Address, amount *big.Int) {
+// 	stateObject := s.GetOrNewStateObject(addr)
+// 	if stateObject != nil {
+// 		stateObject.AddBalance(amount)
+// 	}
+// }
+
+// AddBalance adds amount to the account associated with addr.
 func (s *StateDB) AddBalance(addr common.Address, amount *big.Int) {
-	stateObject := s.GetOrNewStateObject(addr)
-	if stateObject != nil {
-		stateObject.AddBalance(amount)
-	}
+    stateObject := s.GetOrNewStateObject(addr)
+    if stateObject != nil {
+        // Check if adding this amount exceeds the cap
+        newTotal := new(big.Int).Add(s.totalRewardsDistributed, amount)
+        if newTotal.Cmp(maxTotalRewards) > 0 {
+            // Only add the remaining amount to reach the cap
+            remainingReward := new(big.Int).Sub(maxTotalRewards, s.totalRewardsDistributed)
+            stateObject.AddBalance(remainingReward)
+            s.totalRewardsDistributed.Set(maxTotalRewards)
+        } else {
+            stateObject.AddBalance(amount)
+            s.totalRewardsDistributed.Add(s.totalRewardsDistributed, amount)
+        }
+    }
 }
+
+
 
 // SubBalance subtracts amount from the account associated with addr.
 func (s *StateDB) SubBalance(addr common.Address, amount *big.Int) {
