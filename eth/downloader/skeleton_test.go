@@ -94,7 +94,7 @@ func newSkeletonTestPeer(id string, headers []*types.Header) *skeletonTestPeer {
 	}
 }
 
-// newSkeletonTestPeerWithHook creates a new mock peer to test the skeleton sync with,
+// newSkeletonTestPeer creates a new mock peer to test the skeleton sync with,
 // and sets an optional serve hook that can return headers for delivery instead
 // of the predefined chain. Useful for emulating malicious behavior that would
 // otherwise require dedicated peer types.
@@ -173,7 +173,7 @@ func (p *skeletonTestPeer) RequestHeadersByNumber(origin uint64, amount int, ski
 	}
 	res := &eth.Response{
 		Req:  req,
-		Res:  (*eth.BlockHeadersRequest)(&headers),
+		Res:  (*eth.BlockHeadersPacket)(&headers),
 		Meta: hashes,
 		Time: 1,
 		Done: make(chan error),
@@ -434,7 +434,7 @@ func TestSkeletonSyncExtend(t *testing.T) {
 			newstate: []*subchain{
 				{Head: 49, Tail: 49},
 			},
-			err: errChainReorged,
+			err: errReorgDenied,
 		},
 		// Initialize a sync and try to extend it with a number-wise sequential
 		// header, but a hash wise non-linking one.
@@ -444,7 +444,7 @@ func TestSkeletonSyncExtend(t *testing.T) {
 			newstate: []*subchain{
 				{Head: 49, Tail: 49},
 			},
-			err: errChainForked,
+			err: errReorgDenied,
 		},
 		// Initialize a sync and try to extend it with a non-linking future block.
 		{
@@ -453,7 +453,7 @@ func TestSkeletonSyncExtend(t *testing.T) {
 			newstate: []*subchain{
 				{Head: 49, Tail: 49},
 			},
-			err: errChainGapped,
+			err: errReorgDenied,
 		},
 		// Initialize a sync and try to extend it with a past canonical block.
 		{
@@ -462,7 +462,7 @@ func TestSkeletonSyncExtend(t *testing.T) {
 			newstate: []*subchain{
 				{Head: 50, Tail: 50},
 			},
-			err: errChainReorged,
+			err: errReorgDenied,
 		},
 		// Initialize a sync and try to extend it with a past sidechain block.
 		{
@@ -471,7 +471,7 @@ func TestSkeletonSyncExtend(t *testing.T) {
 			newstate: []*subchain{
 				{Head: 50, Tail: 50},
 			},
-			err: errChainReorged,
+			err: errReorgDenied,
 		},
 	}
 	for i, tt := range tests {
@@ -487,7 +487,7 @@ func TestSkeletonSyncExtend(t *testing.T) {
 		skeleton.Sync(tt.head, nil, true)
 
 		<-wait
-		if err := skeleton.Sync(tt.extend, nil, false); !errors.Is(err, tt.err) {
+		if err := skeleton.Sync(tt.extend, nil, false); err != tt.err {
 			t.Errorf("test %d: extension failure mismatch: have %v, want %v", i, err, tt.err)
 		}
 		skeleton.Terminate()
@@ -811,7 +811,7 @@ func TestSkeletonSyncRetrievals(t *testing.T) {
 		// Create a peer set to feed headers through
 		peerset := newPeerSet()
 		for _, peer := range tt.peers {
-			peerset.Register(newPeerConnection(peer.id, eth.ETH68, peer, log.New("id", peer.id)))
+			peerset.Register(newPeerConnection(peer.id, eth.ETH66, peer, log.New("id", peer.id)))
 		}
 		// Create a peer dropper to track malicious peers
 		dropped := make(map[string]int)
@@ -913,7 +913,7 @@ func TestSkeletonSyncRetrievals(t *testing.T) {
 			skeleton.Sync(tt.newHead, nil, true)
 		}
 		if tt.newPeer != nil {
-			if err := peerset.Register(newPeerConnection(tt.newPeer.id, eth.ETH68, tt.newPeer, log.New("id", tt.newPeer.id))); err != nil {
+			if err := peerset.Register(newPeerConnection(tt.newPeer.id, eth.ETH66, tt.newPeer, log.New("id", tt.newPeer.id))); err != nil {
 				t.Errorf("test %d: failed to register new peer: %v", i, err)
 			}
 		}

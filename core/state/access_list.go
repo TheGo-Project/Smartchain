@@ -17,8 +17,6 @@
 package state
 
 import (
-	"maps"
-
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -59,10 +57,16 @@ func newAccessList() *accessList {
 // Copy creates an independent copy of an accessList.
 func (a *accessList) Copy() *accessList {
 	cp := newAccessList()
-	cp.addresses = maps.Clone(a.addresses)
+	for k, v := range a.addresses {
+		cp.addresses[k] = v
+	}
 	cp.slots = make([]map[common.Hash]struct{}, len(a.slots))
 	for i, slotMap := range a.slots {
-		cp.slots[i] = maps.Clone(slotMap)
+		newSlotmap := make(map[common.Hash]struct{}, len(slotMap))
+		for k := range slotMap {
+			newSlotmap[k] = struct{}{}
+		}
+		cp.slots[i] = newSlotmap
 	}
 	return cp
 }

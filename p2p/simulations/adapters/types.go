@@ -21,13 +21,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"strconv"
 
+	"github.com/docker/docker/pkg/reexec"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/internal/reexec"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -130,7 +129,7 @@ type NodeConfig struct {
 	// LogVerbosity is the log verbosity of the p2p node at runtime.
 	//
 	// The default verbosity is INFO.
-	LogVerbosity slog.Level
+	LogVerbosity log.Lvl
 }
 
 // nodeConfigJSON is used to encode and decode NodeConfig as JSON by encoding
@@ -198,7 +197,7 @@ func (n *NodeConfig) UnmarshalJSON(data []byte) error {
 	n.Port = confJSON.Port
 	n.EnableMsgEvents = confJSON.EnableMsgEvents
 	n.LogFile = confJSON.LogFile
-	n.LogVerbosity = slog.Level(confJSON.LogVerbosity)
+	n.LogVerbosity = log.Lvl(confJSON.LogVerbosity)
 
 	return nil
 }
@@ -299,7 +298,7 @@ func RegisterLifecycles(lifecycles LifecycleConstructors) {
 }
 
 // adds the host part to the configuration's ENR, signs it
-// creates and adds the corresponding enode object to the configuration
+// creates and  the corresponding enode object to the configuration
 func (n *NodeConfig) initEnode(ip net.IP, tcpport int, udpport int) error {
 	enrIp := enr.IP(ip)
 	n.Record.Set(&enrIp)

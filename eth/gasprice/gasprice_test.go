@@ -26,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
-	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -98,13 +97,12 @@ func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.
 	return b.chain.GetReceiptsByHash(hash), nil
 }
 
-func (b *testBackend) Pending() (*types.Block, types.Receipts, *state.StateDB) {
+func (b *testBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 	if b.pending {
 		block := b.chain.GetBlockByNumber(testHead + 1)
-		state, _ := b.chain.StateAt(block.Root())
-		return block, b.chain.GetReceiptsByHash(block.Hash()), state
+		return block, b.chain.GetReceiptsByHash(block.Hash())
 	}
-	return nil, nil, nil
+	return nil, nil
 }
 
 func (b *testBackend) ChainConfig() *params.ChainConfig {
@@ -128,7 +126,7 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 		config = *params.TestChainConfig // needs copy because it is modified below
 		gspec  = &core.Genesis{
 			Config: &config,
-			Alloc:  types.GenesisAlloc{addr: {Balance: big.NewInt(math.MaxInt64)}},
+			Alloc:  core.GenesisAlloc{addr: {Balance: big.NewInt(math.MaxInt64)}},
 		}
 		signer = types.LatestSigner(gspec.Config)
 	)

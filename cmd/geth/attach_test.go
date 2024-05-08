@@ -48,7 +48,7 @@ func TestAttachWithHeaders(t *testing.T) {
 	// This is fixed in a follow-up PR.
 }
 
-// TestRemoteDbWithHeaders tests that 'geth db --remotedb' with custom headers works, i.e
+// TestAttachWithHeaders tests that 'geth db --remotedb' with custom headers works, i.e
 // that custom headers are forwarded to the target.
 func TestRemoteDbWithHeaders(t *testing.T) {
 	t.Parallel()
@@ -61,7 +61,7 @@ func TestRemoteDbWithHeaders(t *testing.T) {
 }
 
 func testReceiveHeaders(t *testing.T, ln net.Listener, gethArgs ...string) {
-	var ok atomic.Uint32
+	var ok uint32
 	server := &http.Server{
 		Addr: "localhost:0",
 		Handler: &testHandler{func(w http.ResponseWriter, r *http.Request) {
@@ -72,12 +72,12 @@ func testReceiveHeaders(t *testing.T, ln net.Listener, gethArgs ...string) {
 			if have, want := r.Header.Get("second"), "two"; have != want {
 				t.Fatalf("missing header, have %v want %v", have, want)
 			}
-			ok.Store(1)
+			atomic.StoreUint32(&ok, 1)
 		}}}
 	go server.Serve(ln)
 	defer server.Close()
 	runGeth(t, gethArgs...).WaitExit()
-	if ok.Load() != 1 {
+	if atomic.LoadUint32(&ok) != 1 {
 		t.Fatal("Test fail, expected invocation to succeed")
 	}
 }

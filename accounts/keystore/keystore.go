@@ -87,6 +87,15 @@ func NewKeyStore(keydir string, scryptN, scryptP int) *KeyStore {
 	return ks
 }
 
+// NewPlaintextKeyStore creates a keystore for the given directory.
+// Deprecated: Use NewKeyStore.
+func NewPlaintextKeyStore(keydir string) *KeyStore {
+	keydir, _ = filepath.Abs(keydir)
+	ks := &KeyStore{storage: &keyStorePlain{keydir}}
+	ks.init(keydir)
+	return ks
+}
+
 func (ks *KeyStore) init(keydir string) {
 	// Lock the mutex since the account cache might call back with events
 	ks.mu.Lock()
@@ -500,5 +509,7 @@ func (ks *KeyStore) isUpdating() bool {
 // zeroKey zeroes a private key in memory.
 func zeroKey(k *ecdsa.PrivateKey) {
 	b := k.D.Bits()
-	clear(b)
+	for i := range b {
+		b[i] = 0
+	}
 }

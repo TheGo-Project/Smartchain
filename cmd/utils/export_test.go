@@ -97,7 +97,7 @@ func testExport(t *testing.T, f string) {
 	}
 }
 
-// TestDeletionExport tests if the deletion markers can be exported/imported correctly
+// testDeletion tests if the deletion markers can be exported/imported correctly
 func TestDeletionExport(t *testing.T) {
 	f := fmt.Sprintf("%v/tempdump", os.TempDir())
 	defer func() {
@@ -170,7 +170,6 @@ func testDeletion(t *testing.T, f string) {
 
 // TestImportFutureFormat tests that we reject unsupported future versions.
 func TestImportFutureFormat(t *testing.T) {
-	t.Parallel()
 	f := fmt.Sprintf("%v/tempdump-future", os.TempDir())
 	defer func() {
 		os.Remove(f)

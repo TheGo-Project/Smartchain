@@ -50,8 +50,7 @@ func newBeaconBackfiller(dl *Downloader, success func()) backfiller {
 }
 
 // suspend cancels any background downloader threads and returns the last header
-// that has been successfully backfilled (potentially in a previous run), or the
-// genesis.
+// that has been successfully backfilled.
 func (b *beaconBackfiller) suspend() *types.Header {
 	// If no filling is running, don't waste cycles
 	b.lock.Lock()
@@ -289,9 +288,6 @@ func (d *Downloader) fetchBeaconHeaders(from uint64) error {
 		localHeaders = d.readHeaderRange(tail, int(count))
 		log.Warn("Retrieved beacon headers from local", "from", from, "count", count)
 	}
-	fsHeaderContCheckTimer := time.NewTimer(fsHeaderContCheck)
-	defer fsHeaderContCheckTimer.Stop()
-
 	for {
 		// Some beacon headers might have appeared since the last cycle, make
 		// sure we're always syncing to all available ones
@@ -384,9 +380,8 @@ func (d *Downloader) fetchBeaconHeaders(from uint64) error {
 		}
 		// State sync still going, wait a bit for new headers and retry
 		log.Trace("Pivot not yet committed, waiting...")
-		fsHeaderContCheckTimer.Reset(fsHeaderContCheck)
 		select {
-		case <-fsHeaderContCheckTimer.C:
+		case <-time.After(fsHeaderContCheck):
 		case <-d.cancelCh:
 			return errCanceled
 		}

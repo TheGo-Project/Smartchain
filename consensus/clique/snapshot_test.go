@@ -21,7 +21,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
-	"slices"
+	"sort"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -53,7 +53,7 @@ func (ap *testerAccountPool) checkpoint(header *types.Header, signers []string) 
 	for i, signer := range signers {
 		auths[i] = ap.address(signer)
 	}
-	slices.SortFunc(auths, common.Address.Cmp)
+	sort.Sort(signersAscending(auths))
 	for i, auth := range auths {
 		copy(header.Extra[extraVanity+i*common.AddressLength:], auth.Bytes())
 	}

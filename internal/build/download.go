@@ -40,7 +40,7 @@ func MustLoadChecksums(file string) *ChecksumDB {
 	if err != nil {
 		log.Fatal("can't load checksum file: " + err.Error())
 	}
-	return &ChecksumDB{strings.Split(strings.ReplaceAll(string(content), "\r\n", "\n"), "\n")}
+	return &ChecksumDB{strings.Split(string(content), "\n")}
 }
 
 // Verify checks whether the given file is valid according to the checksum database.
@@ -84,12 +84,10 @@ func (db *ChecksumDB) DownloadFile(url, dstPath string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("download error: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
+	} else if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download error: status %d", resp.StatusCode)
 	}
+	defer resp.Body.Close()
 	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 		return err
 	}

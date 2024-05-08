@@ -21,10 +21,9 @@ import (
 	"crypto/ecdsa"
 	"encoding/base32"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
-	"slices"
+	"sort"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -215,8 +214,8 @@ func (t *Tree) build(entries []entry) entry {
 }
 
 func sortByID(nodes []*enode.Node) []*enode.Node {
-	slices.SortFunc(nodes, func(a, b *enode.Node) int {
-		return bytes.Compare(a.ID().Bytes(), b.ID().Bytes())
+	sort.Slice(nodes, func(i, j int) bool {
+		return bytes.Compare(nodes[i].ID().Bytes(), nodes[j].ID().Bytes()) < 0
 	})
 	return nodes
 }
@@ -342,14 +341,14 @@ func parseLinkEntry(e string) (entry, error) {
 
 func parseLink(e string) (*linkEntry, error) {
 	if !strings.HasPrefix(e, linkPrefix) {
-		return nil, errors.New("wrong/missing scheme 'enrtree' in URL")
+		return nil, fmt.Errorf("wrong/missing scheme 'enrtree' in URL")
 	}
 	e = e[len(linkPrefix):]
-
-	keystring, domain, found := strings.Cut(e, "@")
-	if !found {
+	pos := strings.IndexByte(e, '@')
+	if pos == -1 {
 		return nil, entryError{"link", errNoPubkey}
 	}
+	keystring, domain := e[:pos], e[pos+1:]
 	keybytes, err := b32format.DecodeString(keystring)
 	if err != nil {
 		return nil, entryError{"link", errBadPubkey}

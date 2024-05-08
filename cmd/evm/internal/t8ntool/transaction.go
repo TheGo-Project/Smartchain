@@ -28,6 +28,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/tests"
@@ -64,6 +65,11 @@ func (r *result) MarshalJSON() ([]byte, error) {
 }
 
 func Transaction(ctx *cli.Context) error {
+	// Configure the go-ethereum logger
+	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.TerminalFormat(false)))
+	glogger.Verbosity(log.Lvl(ctx.Int(VerbosityFlag.Name)))
+	log.Root().SetHandler(glogger)
+
 	var (
 		err error
 	)
@@ -86,7 +92,7 @@ func Transaction(ctx *cli.Context) error {
 	if txStr == stdinSelector {
 		decoder := json.NewDecoder(os.Stdin)
 		if err := decoder.Decode(inputData); err != nil {
-			return NewError(ErrorJson, fmt.Errorf("failed unmarshalling stdin: %v", err))
+			return NewError(ErrorJson, fmt.Errorf("failed unmarshaling stdin: %v", err))
 		}
 		// Decode the body of already signed transactions
 		body = common.FromHex(inputData.TxRlp)
@@ -106,7 +112,7 @@ func Transaction(ctx *cli.Context) error {
 			return NewError(ErrorIO, errors.New("only rlp supported"))
 		}
 	}
-	signer := types.MakeSigner(chainConfig, new(big.Int), 0)
+	signer := types.MakeSigner(chainConfig, new(big.Int))
 	// We now have the transactions in 'body', which is supposed to be an
 	// rlp list of transactions
 	it, err := rlp.NewListIterator([]byte(body))
@@ -134,7 +140,7 @@ func Transaction(ctx *cli.Context) error {
 		}
 		// Check intrinsic gas
 		if gas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil,
-			chainConfig.IsHomestead(new(big.Int)), chainConfig.IsIstanbul(new(big.Int)), chainConfig.IsShanghai(new(big.Int), 0)); err != nil {
+			chainConfig.IsHomestead(new(big.Int)), chainConfig.IsIstanbul(new(big.Int)), chainConfig.IsShanghai(0)); err != nil {
 			r.Error = err
 			results = append(results, r)
 			continue
@@ -166,7 +172,7 @@ func Transaction(ctx *cli.Context) error {
 			r.Error = errors.New("gas * maxFeePerGas exceeds 256 bits")
 		}
 		// Check whether the init code size has been exceeded.
-		if chainConfig.IsShanghai(new(big.Int), 0) && tx.To() == nil && len(tx.Data()) > params.MaxInitCodeSize {
+		if chainConfig.IsShanghai(0) && tx.To() == nil && len(tx.Data()) > params.MaxInitCodeSize {
 			r.Error = errors.New("max initcode size exceeded")
 		}
 		results = append(results, r)

@@ -1,8 +1,0 @@
-=============== Apr 17, 2024 (PKT) ===============
-18:50:17.107261 log@legend F·NumFile S·FileSize N·Entry C·BadEntry B·BadBlock Ke·KeyError D·DroppedEntry L·Level Q·SeqNum T·TimeElapsed
-18:50:17.194208 db@open opening
-18:50:17.196416 version@stat F·[] S·0B[] Sc·[]
-18:50:17.235086 db@janitor F·2 G·0
-18:50:17.235639 db@open done T·41.4312ms
-18:51:48.842169 db@close closing
-18:51:48.842729 db@close done T·560.5µs

@@ -65,7 +65,7 @@ type ExternalAPI interface {
 	EcRecover(ctx context.Context, data hexutil.Bytes, sig hexutil.Bytes) (common.Address, error)
 	// Version info about the APIs
 	Version(ctx context.Context) (string, error)
-	// SignGnosisSafeTx signs/confirms a gnosis-safe multisig transaction
+	// SignGnosisSafeTransaction signs/confirms a gnosis-safe multisig transaction
 	SignGnosisSafeTx(ctx context.Context, signerAddress common.MixedcaseAddress, gnosisTx GnosisSafeTx, methodSelector *string) (*GnosisSafeTx, error)
 }
 
@@ -553,7 +553,6 @@ func (api *SignerAPI) SignTransaction(ctx context.Context, args apitypes.SendTxA
 	// If we are in 'rejectMode', then reject rather than show the user warnings
 	if api.rejectMode {
 		if err := msgs.GetWarnings(); err != nil {
-			log.Info("Signing aborted due to warnings. In order to continue despite warnings, please use the flag '--advanced'.")
 			return nil, err
 		}
 	}
@@ -590,10 +589,7 @@ func (api *SignerAPI) SignTransaction(ctx context.Context, args apitypes.SendTxA
 		return nil, err
 	}
 	// Convert fields into a real transaction
-	unsignedTx, err := result.Transaction.ToTransaction()
-	if err != nil {
-		return nil, err
-	}
+	var unsignedTx = result.Transaction.ToTransaction()
 	// Get the password for the transaction
 	pw, err := api.lookupOrQueryPassword(acc.Address, "Account password",
 		fmt.Sprintf("Please enter the password for account %s", acc.Address.String()))
@@ -629,12 +625,11 @@ func (api *SignerAPI) SignGnosisSafeTx(ctx context.Context, signerAddress common
 	// If we are in 'rejectMode', then reject rather than show the user warnings
 	if api.rejectMode {
 		if err := msgs.GetWarnings(); err != nil {
-			log.Info("Signing aborted due to warnings. In order to continue despite warnings, please use the flag '--advanced'.")
 			return nil, err
 		}
 	}
 	typedData := gnosisTx.ToTypedData()
-	// might as well error early.
+	// might aswell error early.
 	// we are expected to sign. If our calculated hash does not match what they want,
 	// The gnosis safetx input contains a 'safeTxHash' which is the expected safeTxHash that
 	sighash, _, err := apitypes.TypedDataAndHash(typedData)

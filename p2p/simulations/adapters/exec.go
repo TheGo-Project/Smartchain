@@ -23,7 +23,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -35,7 +34,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ethereum/go-ethereum/internal/reexec"
+	"github.com/docker/docker/pkg/reexec"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
@@ -303,13 +302,10 @@ func (n *ExecNode) Stop() error {
 	go func() {
 		waitErr <- n.Cmd.Wait()
 	}()
-	timer := time.NewTimer(5 * time.Second)
-	defer timer.Stop()
-
 	select {
 	case err := <-waitErr:
 		return err
-	case <-timer.C:
+	case <-time.After(5 * time.Second):
 		return n.Cmd.Process.Kill()
 	}
 }
@@ -379,11 +375,9 @@ type execNodeConfig struct {
 
 func initLogging() {
 	// Initialize the logging by default first.
-	var innerHandler slog.Handler
-	innerHandler = slog.NewTextHandler(os.Stderr, nil)
-	glogger := log.NewGlogHandler(innerHandler)
-	glogger.Verbosity(log.LevelInfo)
-	log.SetDefault(log.NewLogger(glogger))
+	glogger := log.NewGlogHandler(log.StreamHandler(os.Stderr, log.LogfmtFormat()))
+	glogger.Verbosity(log.LvlInfo)
+	log.Root().SetHandler(glogger)
 
 	confEnv := os.Getenv(envNodeConfig)
 	if confEnv == "" {
@@ -401,15 +395,14 @@ func initLogging() {
 		}
 		writer = logWriter
 	}
-	var verbosity = log.LevelInfo
-	if conf.Node.LogVerbosity <= log.LevelTrace && conf.Node.LogVerbosity >= log.LevelCrit {
-		verbosity = log.FromLegacyLevel(int(conf.Node.LogVerbosity))
+	var verbosity = log.LvlInfo
+	if conf.Node.LogVerbosity <= log.LvlTrace && conf.Node.LogVerbosity >= log.LvlCrit {
+		verbosity = conf.Node.LogVerbosity
 	}
 	// Reinitialize the logger
-	innerHandler = log.NewTerminalHandler(writer, true)
-	glogger = log.NewGlogHandler(innerHandler)
+	glogger = log.NewGlogHandler(log.StreamHandler(writer, log.TerminalFormat(true)))
 	glogger.Verbosity(verbosity)
-	log.SetDefault(log.NewLogger(glogger))
+	log.Root().SetHandler(glogger)
 }
 
 // execP2PNode starts a simulation node when the current binary is executed with
@@ -463,7 +456,7 @@ func startExecNodeStack() (*node.Node, error) {
 	// decode the config
 	confEnv := os.Getenv(envNodeConfig)
 	if confEnv == "" {
-		return nil, errors.New("missing " + envNodeConfig)
+		return nil, fmt.Errorf("missing " + envNodeConfig)
 	}
 	var conf execNodeConfig
 	if err := json.Unmarshal([]byte(confEnv), &conf); err != nil {
