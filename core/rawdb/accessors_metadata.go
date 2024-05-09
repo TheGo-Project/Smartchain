@@ -19,6 +19,7 @@ package rawdb
 import (
 	"encoding/json"
 	"time"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"

@@ -690,7 +690,6 @@ var (
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 var (
-    maxTotalRewards = big.NewInt(1e18) // Maximum rewards in (Wei)
     totalRewardsDistributed = big.NewInt(0) // Initialize to zero
 )
 
@@ -722,12 +721,12 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
 
     // Check and update the total rewards distributed
     newTotal := new(big.Int).Add(totalRewardsDistributed, totalBlockReward)
-    if newTotal.Cmp(maxTotalRewards) <= 0 {
+    if newTotal.Cmp(params.MaxTotalRewards ) <= 0 {
         state.AddBalance(header.Coinbase, totalBlockReward)
         totalRewardsDistributed.Add(totalRewardsDistributed, totalBlockReward)
     } else {
-        remainingReward := new(big.Int).Sub(maxTotalRewards, totalRewardsDistributed)
+        remainingReward := new(big.Int).Sub(params.MaxTotalRewards , totalRewardsDistributed)
         state.AddBalance(header.Coinbase, remainingReward)
-        totalRewardsDistributed.Set(maxTotalRewards)
+        totalRewardsDistributed.Set(params.MaxTotalRewards )
     }
 }

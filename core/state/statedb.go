@@ -414,11 +414,11 @@ func (s *StateDB) AddBalance(addr common.Address, amount *big.Int) {
     if stateObject != nil {
         // Check if adding this amount exceeds the cap
         newTotal := new(big.Int).Add(s.totalRewardsDistributed, amount)
-        if newTotal.Cmp(maxTotalRewards) > 0 {
+        if newTotal.Cmp(params.MaxTotalRewards ) > 0 {
             // Only add the remaining amount to reach the cap
-            remainingReward := new(big.Int).Sub(maxTotalRewards, s.totalRewardsDistributed)
+            remainingReward := new(big.Int).Sub(params.MaxTotalRewards , s.totalRewardsDistributed)
             stateObject.AddBalance(remainingReward)
-            s.totalRewardsDistributed.Set(maxTotalRewards)
+            s.totalRewardsDistributed.Set(params.MaxTotalRewards )
         } else {
             stateObject.AddBalance(amount)
             s.totalRewardsDistributed.Add(s.totalRewardsDistributed, amount)
