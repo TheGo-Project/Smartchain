@@ -689,12 +689,9 @@ var (
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-var (
-    totalRewardsDistributed = big.NewInt(0) // Initialize to zero
-)
+
 
 func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
-    // Define block rewards based on the block's era
     blockReward := big.NewInt(0)
     switch {
     case config.IsConstantinople(header.Number):
@@ -705,7 +702,6 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
         blockReward = FrontierBlockReward
     }
 
-    // Calculate total reward for the block including uncle rewards
     totalBlockReward := new(big.Int).Set(blockReward)
     for _, uncle := range uncles {
         r := new(big.Int)
@@ -719,14 +715,8 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
         totalBlockReward.Add(totalBlockReward, r)
     }
 
-    // Check and update the total rewards distributed
-    newTotal := new(big.Int).Add(totalRewardsDistributed, totalBlockReward)
-    if newTotal.Cmp(params.MaxTotalRewards ) <= 0 {
-        state.AddBalance(header.Coinbase, totalBlockReward)
-        totalRewardsDistributed.Add(totalRewardsDistributed, totalBlockReward)
-    } else {
-        remainingReward := new(big.Int).Sub(params.MaxTotalRewards , totalRewardsDistributed)
-        state.AddBalance(header.Coinbase, remainingReward)
-        totalRewardsDistributed.Set(params.MaxTotalRewards )
-    }
+    // Update the total rewards distributed using the StateDB method
+    state.UpdateTotalRewardsDistributed(totalBlockReward)
+    state.AddBalance(header.Coinbase, totalBlockReward)
 }
+

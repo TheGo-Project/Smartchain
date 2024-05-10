@@ -372,18 +372,24 @@ func (s *stateObject) commitTrie(db Database) (*trie.NodeSet, error) {
 // It is used to add funds to the destination account of a transfer.
 
 func (s *stateObject) AddBalance(amount *big.Int) {
-    newTotal := new(big.Int).Add(s.db.totalRewardsDistributed, amount)
-    cap := new(big.Int).SetUint64(1000000000) 
-
-    if newTotal.Cmp(cap) <= 0 {
-        s.SetBalance(new(big.Int).Add(s.Balance(), amount))
-        s.db.totalRewardsDistributed.Add(s.db.totalRewardsDistributed, amount)
-    } else {
-        remaining := new(big.Int).Sub(cap, s.db.totalRewardsDistributed)
-        s.SetBalance(new(big.Int).Add(s.Balance(), remaining))
-        s.db.totalRewardsDistributed.Set(cap)
-    }
+    newBalance := new(big.Int).Add(s.Balance(), amount)
+    s.SetBalance(newBalance)
 }
+
+
+// func (s *stateObject) AddBalance(amount *big.Int) {
+//     newTotal := new(big.Int).Add(s.db.totalRewardsDistributed, amount)
+//     cap := new(big.Int).SetUint64(1000000000) 
+
+//     if newTotal.Cmp(cap) <= 0 {
+//         s.SetBalance(new(big.Int).Add(s.Balance(), amount))
+//         s.db.totalRewardsDistributed.Add(s.db.totalRewardsDistributed, amount)
+//     } else {
+//         remaining := new(big.Int).Sub(cap, s.db.totalRewardsDistributed)
+//         s.SetBalance(new(big.Int).Add(s.Balance(), remaining))
+//         s.db.totalRewardsDistributed.Set(cap)
+//     }
+// }
 
 
 // func (s *stateObject) AddBalance(amount *big.Int) {

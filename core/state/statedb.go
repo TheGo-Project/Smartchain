@@ -34,6 +34,7 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 type revision struct {
@@ -139,6 +140,16 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
     if err != nil {
         return nil, err
     }
+	kvReader, ok := db.(ethdb.KeyValueReader)
+    if !ok {
+        return nil, fmt.Errorf("database does not support key-value read operations")
+    }
+
+    totalRewardsDistributed := rawdb.ReadTotalRewardsDistributed(kvReader)
+    if totalRewardsDistributed == nil {
+        totalRewardsDistributed = big.NewInt(0)
+    }
+
     sdb := &StateDB{
         db:                     db,
         trie:                   tr,
@@ -155,7 +166,7 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
         transientStorage:       newTransientStorage(),
         hasher:                 crypto.NewKeccakState(),
 
-        totalRewardsDistributed: big.NewInt(0), // Initialize as zero
+        totalRewardsDistributed: totalRewardsDistributed, // Initialize as zero
     }
     if sdb.snaps != nil {
         if sdb.snap = sdb.snaps.Snapshot(root); sdb.snap != nil {
@@ -166,6 +177,18 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
     return sdb, nil
 }
 
+// Safe update of the total rewards distributed with cap check
+func (s *StateDB) UpdateTotalRewardsDistributed(amount *big.Int) {
+    if amount == nil {
+        amount = big.NewInt(0) // Ensure amount is never nil
+    }
+    newTotal := new(big.Int).Add(s.totalRewardsDistributed, amount)
+    if newTotal.Cmp(params.MaxTotalRewards) > 0 {
+        // Cap reached, adjust the amount
+        amount = new(big.Int).Sub(params.MaxTotalRewards, s.totalRewardsDistributed)
+    }
+    s.totalRewardsDistributed.Add(s.totalRewardsDistributed, amount)
+}
 
 // StartPrefetcher initializes a new trie prefetcher to pull in nodes from the
 // state trie concurrently while the state is mutated so that when we reach the
