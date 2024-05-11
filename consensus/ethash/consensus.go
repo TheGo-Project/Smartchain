@@ -690,33 +690,66 @@ var (
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
 
-
 func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
     blockReward := big.NewInt(0)
-    switch {
-    case config.IsConstantinople(header.Number):
-        blockReward = ConstantinopleBlockReward
-    case config.IsByzantium(header.Number):
-        blockReward = ByzantiumBlockReward
-    default:
-        blockReward = FrontierBlockReward
-    }
-
     totalBlockReward := new(big.Int).Set(blockReward)
-    for _, uncle := range uncles {
-        r := new(big.Int)
-        r.Add(uncle.Number, big.NewInt(8))
-        r.Sub(r, header.Number)
-        r.Mul(r, blockReward)
-        r.Div(r, big.NewInt(8))
-        state.AddBalance(uncle.Coinbase, r)
 
-        r.Div(blockReward, big.NewInt(32))
+    for _, uncle := range uncles {
+        r := calculateUncleReward(uncle, header, blockReward)
+        state.AddBalance(uncle.Coinbase, r)
         totalBlockReward.Add(totalBlockReward, r)
     }
 
-    // Update the total rewards distributed using the StateDB method
-    state.UpdateTotalRewardsDistributed(totalBlockReward)
-    state.AddBalance(header.Coinbase, totalBlockReward)
+    // Check and apply the cap on the total rewards
+    newTotal := new(big.Int).Add(state.totalRewardsDistributed, totalBlockReward)
+    if newTotal.Cmp(params.MaxTotalRewards) > 0 {
+        remainingReward := new(big.Int).Sub(params.MaxTotalRewards, state.totalRewardsDistributed)
+        if remainingReward.Sign() > 0 {
+            state.AddBalance(header.Coinbase, remainingReward)
+        }
+    } else {
+        state.AddBalance(header.Coinbase, totalBlockReward)
+    }
+    state.totalRewardsDistributed.Add(state.totalRewardsDistributed, totalBlockReward)
 }
+
+func calculateUncleReward(uncle *types.Header, header *types.Header, blockReward *big.Int) *big.Int {
+    r := new(big.Int)
+    r.Add(uncle.Number, big.NewInt(8))
+    r.Sub(r, header.Number)
+    r.Mul(r, blockReward)
+    r.Div(r, big.NewInt(8))
+    return r
+}
+
+
+
+// func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
+//     blockReward := big.NewInt(0)
+//     switch {
+//     case config.IsConstantinople(header.Number):
+//         blockReward = ConstantinopleBlockReward
+//     case config.IsByzantium(header.Number):
+//         blockReward = ByzantiumBlockReward
+//     default:
+//         blockReward = FrontierBlockReward
+//     }
+
+//     totalBlockReward := new(big.Int).Set(blockReward)
+//     for _, uncle := range uncles {
+//         r := new(big.Int)
+//         r.Add(uncle.Number, big.NewInt(8))
+//         r.Sub(r, header.Number)
+//         r.Mul(r, blockReward)
+//         r.Div(r, big.NewInt(8))
+//         state.AddBalance(uncle.Coinbase, r)
+
+//         r.Div(blockReward, big.NewInt(32))
+//         totalBlockReward.Add(totalBlockReward, r)
+//     }
+
+//     // Update the total rewards distributed using the StateDB method
+//     state.UpdateTotalRewardsDistributed(totalBlockReward)
+//     state.AddBalance(header.Coinbase, totalBlockReward)
+// }
 

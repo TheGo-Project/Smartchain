@@ -29,21 +29,25 @@ import (
 )
 
 
-//WriteTotalRewardsDistributed to write the total reward distributed
+// WriteTotalRewardsDistributed writes the total reward distributed to the database.
 func WriteTotalRewardsDistributed(db ethdb.KeyValueWriter, total *big.Int) {
     key := []byte("totalRewardsDistributed")
     val := total.Bytes()
     db.Put(key, val)
 }
 
-//ReadTotalRewardsDistributed To read total reward distributed from database
+// ReadTotalRewardsDistributed reads the total reward distributed from the database.
 func ReadTotalRewardsDistributed(db ethdb.KeyValueReader) *big.Int {
     key := []byte("totalRewardsDistributed")
-    if data, _ := db.Get(key); data != nil {
-        return new(big.Int).SetBytes(data)
+    data, err := db.Get(key)
+    if err != nil {
+        log.Error("Failed to read total rewards distributed", "err", err)
+        return big.NewInt(0) // Return zero if not found or on error
     }
-    return new(big.Int) //return 0 if not found, => for the genesis block
+    total := new(big.Int).SetBytes(data)
+    return total
 }
+
 
 // ReadDatabaseVersion retrieves the version number of the database.
 func ReadDatabaseVersion(db ethdb.KeyValueReader) *uint64 {

@@ -140,7 +140,8 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
     if err != nil {
         return nil, err
     }
-	kvReader, ok := db.(ethdb.KeyValueReader)
+
+    kvReader, ok := db.(ethdb.KeyValueReader)
     if !ok {
         return nil, fmt.Errorf("database does not support key-value read operations")
     }
@@ -165,8 +166,7 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
         accessList:             newAccessList(),
         transientStorage:       newTransientStorage(),
         hasher:                 crypto.NewKeccakState(),
-
-        totalRewardsDistributed: totalRewardsDistributed, // Initialize as zero
+        totalRewardsDistributed: totalRewardsDistributed,
     }
     if sdb.snaps != nil {
         if sdb.snap = sdb.snaps.Snapshot(root); sdb.snap != nil {
