@@ -224,8 +224,6 @@ type BlockChain struct {
 	processor  Processor // Block transaction processor interface
 	forker     *ForkChoice
 	vmConfig   vm.Config
-
-	totalRewardsDistributed *big.Int //Defining State Variable, for tracking total rewards distributed over the blockchain 
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -272,7 +270,6 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, genesis *Genesis
 		futureBlocks:  lru.NewCache[common.Hash, *types.Block](maxFutureBlocks),
 		engine:        engine,
 		vmConfig:      vmConfig,
-		totalRewardsDistributed: rawdb.ReadTotalRewardsDistributed(db), //initializing it with zero or load
 	}
 	bc.flushInterval.Store(int64(cacheConfig.TrieTimeLimit))
 	bc.forker = NewForkChoice(bc, shouldPreserve)

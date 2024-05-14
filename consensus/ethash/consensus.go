@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"runtime"
 	"time"
@@ -660,6 +661,54 @@ var (
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
+
+func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
+    // Select the correct block reward based on chain progression
+    blockReward := FrontierBlockReward
+    if config.IsByzantium(header.Number) {
+        blockReward = ByzantiumBlockReward
+    }
+    if config.IsConstantinople(header.Number) {
+        blockReward = ConstantinopleBlockReward
+    }
+    log.Printf("Block reward selected: %s", blockReward)
+
+    // Accumulate the rewards for the miner and any included uncles
+    reward := new(big.Int).Set(blockReward)
+    r := new(big.Int)
+    for _, uncle := range uncles {
+        r.Add(uncle.Number, big8)
+        r.Sub(r, header.Number)
+        r.Mul(r, blockReward)
+        r.Div(r, big8)
+        state.AddBalance(uncle.Coinbase, r)
+        log.Printf("Uncle reward added: %s to %s", r, uncle.Coinbase.Hex())
+
+        r.Div(blockReward, big32)
+        reward.Add(reward, r)
+    }
+    log.Printf("Total block reward computed: %s", reward)
+
+    // Check and update total supply cap before awarding block reward
+    currentSupply := state.GetTotalSupply()
+    log.Printf("Current total supply: %s", currentSupply)
+    if currentSupply.Cmp(big.NewInt(params.MaxTotalRewards)) < 0 {
+        remainingReward := new(big.Int).Sub(big.NewInt(params.MaxTotalRewards), currentSupply)
+        log.Printf("Remaining reward capacity: %s", remainingReward)
+        if reward.Cmp(remainingReward) > 0 {
+            reward = remainingReward
+            log.Printf("Reducing block reward to fit cap: %s", reward)
+        }
+        state.UpdateTotalSupply(reward) // Update the total supply
+        state.AddBalance(header.Coinbase, reward)
+        log.Printf("Block reward of %s added to miner %s", reward, header.Coinbase.Hex())
+    } else {
+        log.Printf("Block reward of %s not added as it would exceed cap of %s", reward, big.NewInt(params.MaxTotalRewards))
+    }
+}
+
+
+
 // func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
 // 	// Select the correct block reward based on chain progression
 // 	blockReward := FrontierBlockReward
@@ -684,72 +733,3 @@ var (
 // 	}
 // 	state.AddBalance(header.Coinbase, reward)
 // }
-
-
-// AccumulateRewards credits the coinbase of the given block with the mining
-// reward. The total reward consists of the static block reward and rewards for
-// included uncles. The coinbase of each uncle block is also rewarded.
-
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
-    blockReward := big.NewInt(0)
-    totalBlockReward := new(big.Int).Set(blockReward)
-
-    for _, uncle := range uncles {
-        r := calculateUncleReward(uncle, header, blockReward)
-        state.AddBalance(uncle.Coinbase, r)
-        totalBlockReward.Add(totalBlockReward, r)
-    }
-
-    // Check and apply the cap on the total rewards
-    newTotal := new(big.Int).Add(state.totalRewardsDistributed, totalBlockReward)
-    if newTotal.Cmp(params.MaxTotalRewards) > 0 {
-        remainingReward := new(big.Int).Sub(params.MaxTotalRewards, state.totalRewardsDistributed)
-        if remainingReward.Sign() > 0 {
-            state.AddBalance(header.Coinbase, remainingReward)
-        }
-    } else {
-        state.AddBalance(header.Coinbase, totalBlockReward)
-    }
-    state.totalRewardsDistributed.Add(state.totalRewardsDistributed, totalBlockReward)
-}
-
-func calculateUncleReward(uncle *types.Header, header *types.Header, blockReward *big.Int) *big.Int {
-    r := new(big.Int)
-    r.Add(uncle.Number, big.NewInt(8))
-    r.Sub(r, header.Number)
-    r.Mul(r, blockReward)
-    r.Div(r, big.NewInt(8))
-    return r
-}
-
-
-
-// func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
-//     blockReward := big.NewInt(0)
-//     switch {
-//     case config.IsConstantinople(header.Number):
-//         blockReward = ConstantinopleBlockReward
-//     case config.IsByzantium(header.Number):
-//         blockReward = ByzantiumBlockReward
-//     default:
-//         blockReward = FrontierBlockReward
-//     }
-
-//     totalBlockReward := new(big.Int).Set(blockReward)
-//     for _, uncle := range uncles {
-//         r := new(big.Int)
-//         r.Add(uncle.Number, big.NewInt(8))
-//         r.Sub(r, header.Number)
-//         r.Mul(r, blockReward)
-//         r.Div(r, big.NewInt(8))
-//         state.AddBalance(uncle.Coinbase, r)
-
-//         r.Div(blockReward, big.NewInt(32))
-//         totalBlockReward.Add(totalBlockReward, r)
-//     }
-
-//     // Update the total rewards distributed using the StateDB method
-//     state.UpdateTotalRewardsDistributed(totalBlockReward)
-//     state.AddBalance(header.Coinbase, totalBlockReward)
-// }
-

@@ -34,7 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 type revision struct {
@@ -128,66 +127,61 @@ type StateDB struct {
 	StorageUpdated int
 	AccountDeleted int
 	StorageDeleted int
-
-	totalRewardsDistributed *big.Int
-
-
 }
 
 // New creates a new state from a given trie.
 func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) {
-    tr, err := db.OpenTrie(root)
-    if err != nil {
-        return nil, err
-    }
-
-    kvReader, ok := db.(ethdb.KeyValueReader)
-    if !ok {
-        return nil, fmt.Errorf("database does not support key-value read operations")
-    }
-
-    totalRewardsDistributed := rawdb.ReadTotalRewardsDistributed(kvReader)
-    if totalRewardsDistributed == nil {
-        totalRewardsDistributed = big.NewInt(0)
-    }
-
-    sdb := &StateDB{
-        db:                     db,
-        trie:                   tr,
-        originalRoot:           root,
-        snaps:                  snaps,
-        stateObjects:           make(map[common.Address]*stateObject),
-        stateObjectsPending:    make(map[common.Address]struct{}),
-        stateObjectsDirty:      make(map[common.Address]struct{}),
-        stateObjectsDestruct:   make(map[common.Address]struct{}),
-        logs:                   make(map[common.Hash][]*types.Log),
-        preimages:              make(map[common.Hash][]byte),
-        journal:                newJournal(),
-        accessList:             newAccessList(),
-        transientStorage:       newTransientStorage(),
-        hasher:                 crypto.NewKeccakState(),
-        totalRewardsDistributed: totalRewardsDistributed,
-    }
-    if sdb.snaps != nil {
-        if sdb.snap = sdb.snaps.Snapshot(root); sdb.snap != nil {
-            sdb.snapAccounts = make(map[common.Hash][]byte)
-            sdb.snapStorage = make(map[common.Hash]map[common.Hash][]byte)
-        }
-    }
-    return sdb, nil
+	tr, err := db.OpenTrie(root)
+	if err != nil {
+		return nil, err
+	}
+	sdb := &StateDB{
+		db:                   db,
+		trie:                 tr,
+		originalRoot:         root,
+		snaps:                snaps,
+		stateObjects:         make(map[common.Address]*stateObject),
+		stateObjectsPending:  make(map[common.Address]struct{}),
+		stateObjectsDirty:    make(map[common.Address]struct{}),
+		stateObjectsDestruct: make(map[common.Address]struct{}),
+		logs:                 make(map[common.Hash][]*types.Log),
+		preimages:            make(map[common.Hash][]byte),
+		journal:              newJournal(),
+		accessList:           newAccessList(),
+		transientStorage:     newTransientStorage(),
+		hasher:               crypto.NewKeccakState(),
+	}
+	if sdb.snaps != nil {
+		if sdb.snap = sdb.snaps.Snapshot(root); sdb.snap != nil {
+			sdb.snapAccounts = make(map[common.Hash][]byte)
+			sdb.snapStorage = make(map[common.Hash]map[common.Hash][]byte)
+		}
+	}
+	return sdb, nil
 }
 
-// Safe update of the total rewards distributed with cap check
-func (s *StateDB) UpdateTotalRewardsDistributed(amount *big.Int) {
-    if amount == nil {
-        amount = big.NewInt(0) // Ensure amount is never nil
+// func main() {
+//     hash := sha256.Sum256([]byte("unique string for $GSMC total supply key"))
+//     fmt.Printf("totalSupplyKey: %x\n", hash)
+// }
+
+//use the function generated hash
+var totalSupplyKey = common.HexToHash("06a754a6cbe99e7bf68e40e792c92595d3ae5238a2fbc0497482c65ed4a113fc") 
+
+// GetTotalSupply returns the current total supply from the state.
+func (s *StateDB) GetTotalSupply() *big.Int {
+    data := s.GetState(common.Address{}, totalSupplyKey)
+    if data == (common.Hash{}) {
+        return big.NewInt(0)
     }
-    newTotal := new(big.Int).Add(s.totalRewardsDistributed, amount)
-    if newTotal.Cmp(params.MaxTotalRewards) > 0 {
-        // Cap reached, adjust the amount
-        amount = new(big.Int).Sub(params.MaxTotalRewards, s.totalRewardsDistributed)
-    }
-    s.totalRewardsDistributed.Add(s.totalRewardsDistributed, amount)
+    return new(big.Int).SetBytes(data[:])
+}
+
+// UpdateTotalSupply updates the total supply in the state.
+func (s *StateDB) UpdateTotalSupply(amount *big.Int) {
+    currentSupply := s.GetTotalSupply()
+    newSupply := new(big.Int).Add(currentSupply, amount)
+    s.SetState(common.Address{}, totalSupplyKey, common.BigToHash(newSupply))
 }
 
 // StartPrefetcher initializes a new trie prefetcher to pull in nodes from the
@@ -424,32 +418,12 @@ func (s *StateDB) HasSuicided(addr common.Address) bool {
  */
 
 // AddBalance adds amount to the account associated with addr.
-// func (s *StateDB) AddBalance(addr common.Address, amount *big.Int) {
-// 	stateObject := s.GetOrNewStateObject(addr)
-// 	if stateObject != nil {
-// 		stateObject.AddBalance(amount)
-// 	}
-// }
-
-// AddBalance adds amount to the account associated with addr.
 func (s *StateDB) AddBalance(addr common.Address, amount *big.Int) {
-    stateObject := s.GetOrNewStateObject(addr)
-    if stateObject != nil {
-        // Check if adding this amount exceeds the cap
-        newTotal := new(big.Int).Add(s.totalRewardsDistributed, amount)
-        if newTotal.Cmp(params.MaxTotalRewards ) > 0 {
-            // Only add the remaining amount to reach the cap
-            remainingReward := new(big.Int).Sub(params.MaxTotalRewards , s.totalRewardsDistributed)
-            stateObject.AddBalance(remainingReward)
-            s.totalRewardsDistributed.Set(params.MaxTotalRewards )
-        } else {
-            stateObject.AddBalance(amount)
-            s.totalRewardsDistributed.Add(s.totalRewardsDistributed, amount)
-        }
-    }
+	stateObject := s.GetOrNewStateObject(addr)
+	if stateObject != nil {
+		stateObject.AddBalance(amount)
+	}
 }
-
-
 
 // SubBalance subtracts amount from the account associated with addr.
 func (s *StateDB) SubBalance(addr common.Address, amount *big.Int) {

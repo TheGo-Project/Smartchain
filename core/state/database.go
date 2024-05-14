@@ -161,6 +161,7 @@ type cachingDB struct {
 	triedb        *trie.Database
 }
 
+
 // OpenTrie opens the main account trie at a specific root hash.
 func (db *cachingDB) OpenTrie(root common.Hash) (Trie, error) {
 	tr, err := trie.NewStateTrie(trie.StateTrieID(root), db.triedb)
