@@ -172,6 +172,7 @@ var totalSupplyKey = common.HexToHash("06a754a6cbe99e7bf68e40e792c92595d3ae5238a
 func (s *StateDB) GetTotalSupply() *big.Int {
     data := s.GetState(common.Address{}, totalSupplyKey)
     if data == (common.Hash{}) {
+		
         return big.NewInt(0)
     }
     return new(big.Int).SetBytes(data[:])

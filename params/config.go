@@ -25,8 +25,11 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+
 // MaxTotalRewards defines the maximum amount of the $GSMC tokens that can be distributed.
-var MaxTotalRewards  = big.NewInt(1e9) // 1 billion tokens
+// const MaxTotalRewards = 1000000000
+const MaxTotalRewards = 1e9 * 1e18 // 1 billion ether in wei
+
 
 // Genesis hashes to enforce below configs on.
 var (

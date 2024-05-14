@@ -651,12 +651,11 @@ func (ethash *Ethash) SealHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
-
 // Some weird constants to avoid constant memory allocs for them.
 var (
 	big8  = big.NewInt(8)
 	big32 = big.NewInt(32)
-)	
+)
 
 // AccumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
@@ -692,8 +691,12 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
     // Check and update total supply cap before awarding block reward
     currentSupply := state.GetTotalSupply()
     log.Printf("Current total supply: %s", currentSupply)
-    if currentSupply.Cmp(big.NewInt(params.MaxTotalRewards)) < 0 {
-        remainingReward := new(big.Int).Sub(big.NewInt(params.MaxTotalRewards), currentSupply)
+
+    maxTotalRewards := new(big.Int)
+
+    maxTotalRewards.SetString("1000000000000000000000000000", 10)
+    if currentSupply.Cmp(maxTotalRewards) < 0 {
+        remainingReward := new(big.Int).Sub(maxTotalRewards, currentSupply)
         log.Printf("Remaining reward capacity: %s", remainingReward)
         if reward.Cmp(remainingReward) > 0 {
             reward = remainingReward
@@ -703,9 +706,10 @@ func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header 
         state.AddBalance(header.Coinbase, reward)
         log.Printf("Block reward of %s added to miner %s", reward, header.Coinbase.Hex())
     } else {
-        log.Printf("Block reward of %s not added as it would exceed cap of %s", reward, big.NewInt(params.MaxTotalRewards))
+        log.Printf("Block reward of %s not added as it would exceed cap of %s", reward, maxTotalRewards)
     }
 }
+
 
 
 
