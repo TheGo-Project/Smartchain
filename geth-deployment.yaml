@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geth-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: geth
+  template:
+    metadata:
+      labels:
+        app: geth
+    spec:
+      containers:
+      - name: geth
+        image: us-central1-docker.pkg.dev/health-hero-bot/gcr-repo/smartchain
+        ports:
+        - containerPort: 8545
+        - containerPort: 30303
+        volumeMounts:
+        - name: geth-data
+          mountPath: /root/.ethereum
+      volumes:
+      - name: geth-data
+        persistentVolumeClaim:
+          claimName: geth-pvc
