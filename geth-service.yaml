@@ -8,9 +8,10 @@ spec:
   ports:
   - name: json-rpc
     protocol: TCP
-    port: 8545  # JSON-RPC
+    port: 8545
     targetPort: 8545
   - name: p2p
     protocol: TCP
-    port: 30303 # P2P
+    port: 30303
     targetPort: 30303
+  type: LoadBalancer

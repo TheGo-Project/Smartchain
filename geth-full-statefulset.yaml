@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: geth-full-node
+spec:
+  serviceName: "geth-service"
+  replicas: 3
+  selector:
+    matchLabels:
+      app: geth
+      type: full
+  template:
+    metadata:
+      labels:
+        app: geth
+        type: full
+    spec:
+      containers:
+      - name: geth
+        image: us-central1-docker.pkg.dev/health-hero-bot/blockchain-repo/smartchain
+        env:
+        - name: NODE_TYPE
+          value: "full"
+        ports:
+        - containerPort: 8545
+        - containerPort: 30303
+        volumeMounts:
+        - name: geth-data
+          mountPath: /node/data
+      nodeSelector:
+        cloud.google.com/gke-nodepool: blockchain-poo
+  volumeClaimTemplates:
+  - metadata:
+      name: geth-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 1000Gi
