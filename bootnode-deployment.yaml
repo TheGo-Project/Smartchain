@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bootnode
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geth
+      role: bootnode
+  template:
+    metadata:
+      labels:
+        app: geth
+        role: bootnode
+    spec:
+      containers:
+      - name: bootnode
+        image: ethereum/client-go:latest
+        command: ["bootnode"]
+        args: ["-nodekeyhex", "ab73b310bb952ce2082ec61c231329a843a12acadc2455fb4f54df3249004bcf", "-addr", ":30301"]
+        ports:
+        - containerPort: 30301
+          protocol: UDP

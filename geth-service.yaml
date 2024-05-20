@@ -14,4 +14,8 @@ spec:
     protocol: TCP
     port: 30303
     targetPort: 30303
+  - name: discovery
+    protocol: UDP
+    port: 30303
+    targetPort: 30303
   type: LoadBalancer
