@@ -30,15 +30,18 @@ COPY --from=builder /go-ethereum/build/bin/bootnode /usr/local/bin/
 # Copy genesis block configuration
 COPY genesis.json /root/genesis.json
 
+# Copy the bootnode key
+COPY boot.key /root/boot/boot.key
+
 # Copy the entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 8545 8546 30303 30303/udp 30305
+EXPOSE 8545 8546 30303 30303/udp 30301
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Add some metadata labels to help programatic image consumption
+# Add some metadata labels to help programmatic image consumption
 ARG COMMIT=""
 ARG VERSION=""
 ARG BUILDNUM=""

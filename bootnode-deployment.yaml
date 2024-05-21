@@ -16,9 +16,17 @@ spec:
     spec:
       containers:
       - name: bootnode
-        image: ethereum/client-go:latest
-        command: ["bootnode"]
-        args: ["-nodekeyhex", "ab73b310bb952ce2082ec61c231329a843a12acadc2455fb4f54df3249004bcf", "-addr", ":30301"]
+        image: us-central1-docker.pkg.dev/health-hero-bot/blockchain-repo/smartchain
+        env:
+        - name: NODE_TYPE
+          value: "bootnode"
         ports:
         - containerPort: 30301
           protocol: UDP
+        volumeMounts:
+        - name: boot-key
+          mountPath: /root/boot
+      volumes:
+      - name: boot-key
+        secret:
+          secretName: boot-key-secret

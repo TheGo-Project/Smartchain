@@ -28,12 +28,12 @@ spec:
         - name: geth-data
           mountPath: /node/data
       nodeSelector:
-        cloud.google.com/gke-nodepool: blockchain-poo
+        cloud.google.com/gke-nodepool: blockchain-pool
   volumeClaimTemplates:
   - metadata:
       name: geth-data
     spec:
-      accessModes: [ "ReadWriteOnce" ]
+      accessModes: ["ReadWriteOnce"]
       resources:
         requests:
           storage: 1000Gi
