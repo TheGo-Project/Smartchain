@@ -19,7 +19,7 @@ package dbtest
 import (
 	"bytes"
 	"crypto/rand"
-	"reflect"
+	"slices"
 	"sort"
 	"testing"
 
@@ -148,7 +148,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 			if err := it.Error(); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(got, want) {
+			if !slices.Equal(got, want) {
 				t.Errorf("Iterator: got: %s; want: %s", got, want)
 			}
 		}
@@ -159,7 +159,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 			if err := it.Error(); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(got, want) {
+			if !slices.Equal(got, want) {
 				t.Errorf("IteratorWith(1,nil): got: %s; want: %s", got, want)
 			}
 		}
@@ -170,7 +170,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 			if err := it.Error(); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(got, want) {
+			if !slices.Equal(got, want) {
 				t.Errorf("IteratorWith(5,nil): got: %s; want: %s", got, want)
 			}
 		}
@@ -181,7 +181,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 			if err := it.Error(); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(got, want) {
+			if !slices.Equal(got, want) {
 				t.Errorf("IteratorWith(nil,2): got: %s; want: %s", got, want)
 			}
 		}
@@ -192,7 +192,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 			if err := it.Error(); err != nil {
 				t.Fatal(err)
 			}
-			if !reflect.DeepEqual(got, want) {
+			if !slices.Equal(got, want) {
 				t.Errorf("IteratorWith(nil,5): got: %s; want: %s", got, want)
 			}
 		}
@@ -261,7 +261,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 
 		{
 			it := db.NewIterator(nil, nil)
-			if got, want := iterateKeys(it), []string{"1", "2", "3", "4"}; !reflect.DeepEqual(got, want) {
+			if got, want := iterateKeys(it), []string{"1", "2", "3", "4"}; !slices.Equal(got, want) {
 				t.Errorf("got: %s; want: %s", got, want)
 			}
 		}
@@ -272,8 +272,12 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 		b.Put([]byte("5"), nil)
 		b.Delete([]byte("1"))
 		b.Put([]byte("6"), nil)
-		b.Delete([]byte("3"))
+
+		b.Delete([]byte("3")) // delete then put
 		b.Put([]byte("3"), nil)
+
+		b.Put([]byte("7"), nil) // put then delete
+		b.Delete([]byte("7"))
 
 		if err := b.Write(); err != nil {
 			t.Fatal(err)
@@ -281,7 +285,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 
 		{
 			it := db.NewIterator(nil, nil)
-			if got, want := iterateKeys(it), []string{"2", "3", "4", "5", "6"}; !reflect.DeepEqual(got, want) {
+			if got, want := iterateKeys(it), []string{"2", "3", "4", "5", "6"}; !slices.Equal(got, want) {
 				t.Errorf("got: %s; want: %s", got, want)
 			}
 		}
@@ -309,7 +313,7 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 		}
 
 		it := db.NewIterator(nil, nil)
-		if got := iterateKeys(it); !reflect.DeepEqual(got, want) {
+		if got := iterateKeys(it); !slices.Equal(got, want) {
 			t.Errorf("got: %s; want: %s", got, want)
 		}
 	})
@@ -374,6 +378,32 @@ func TestDatabaseSuite(t *testing.T, New func() ethdb.KeyValueStore) {
 			if err != nil || len(got) == 0 {
 				t.Fatal("Unexpected deletion")
 			}
+		}
+	})
+
+	t.Run("OperationsAfterClose", func(t *testing.T) {
+		db := New()
+		db.Put([]byte("key"), []byte("value"))
+		db.Close()
+		if _, err := db.Get([]byte("key")); err == nil {
+			t.Fatalf("expected error on Get after Close")
+		}
+		if _, err := db.Has([]byte("key")); err == nil {
+			t.Fatalf("expected error on Get after Close")
+		}
+		if err := db.Put([]byte("key2"), []byte("value2")); err == nil {
+			t.Fatalf("expected error on Put after Close")
+		}
+		if err := db.Delete([]byte("key")); err == nil {
+			t.Fatalf("expected error on Delete after Close")
+		}
+
+		b := db.NewBatch()
+		if err := b.Put([]byte("batchkey"), []byte("batchval")); err != nil {
+			t.Fatalf("expected no error on batch.Put after Close, got %v", err)
+		}
+		if err := b.Write(); err == nil {
+			t.Fatalf("expected error on batch.Write after Close")
 		}
 	})
 }
@@ -483,7 +513,7 @@ func iterateKeys(it ethdb.Iterator) []string {
 	return keys
 }
 
-// randomHash generates a random blob of data and returns it as a hash.
+// randBytes generates a random blob of data.
 func randBytes(len int) []byte {
 	buf := make([]byte, len)
 	if n, err := rand.Read(buf); n != len || err != nil {
@@ -500,7 +530,7 @@ func makeDataset(size, ksize, vsize int, order bool) ([][]byte, [][]byte) {
 		vals = append(vals, randBytes(vsize))
 	}
 	if order {
-		sort.Slice(keys, func(i, j int) bool { return bytes.Compare(keys[i], keys[j]) < 0 })
+		slices.SortFunc(keys, bytes.Compare)
 	}
 	return keys, vals
 }

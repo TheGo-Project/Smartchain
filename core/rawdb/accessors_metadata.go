@@ -19,7 +19,6 @@ package rawdb
 import (
 	"encoding/json"
 	"time"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -27,27 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 )
-
-
-// WriteTotalRewardsDistributed writes the total reward distributed to the database.
-func WriteTotalRewardsDistributed(db ethdb.KeyValueWriter, total *big.Int) {
-    key := []byte("totalRewardsDistributed")
-    val := total.Bytes()
-    db.Put(key, val)
-}
-
-// ReadTotalRewardsDistributed reads the total reward distributed from the database.
-func ReadTotalRewardsDistributed(db ethdb.KeyValueReader) *big.Int {
-    key := []byte("totalRewardsDistributed")
-    data, err := db.Get(key)
-    if err != nil {
-        log.Error("Failed to read total rewards distributed", "err", err)
-        return big.NewInt(0) // Return zero if not found or on error
-    }
-    total := new(big.Int).SetBytes(data)
-    return total
-}
-
 
 // ReadDatabaseVersion retrieves the version number of the database.
 func ReadDatabaseVersion(db ethdb.KeyValueReader) *uint64 {
@@ -88,7 +66,6 @@ func ReadChainConfig(db ethdb.KeyValueReader, hash common.Hash) *params.ChainCon
 	}
 	return &config
 }
-
 
 // WriteChainConfig writes the chain config settings to the database.
 func WriteChainConfig(db ethdb.KeyValueWriter, hash common.Hash, cfg *params.ChainConfig) {
@@ -134,10 +111,10 @@ const crashesToKeep = 10
 func PushUncleanShutdownMarker(db ethdb.KeyValueStore) ([]uint64, uint64, error) {
 	var uncleanShutdowns crashList
 	// Read old data
-	if data, err := db.Get(uncleanShutdownKey); err != nil {
-		log.Warn("Error reading unclean shutdown markers", "error", err)
-	} else if err := rlp.DecodeBytes(data, &uncleanShutdowns); err != nil {
-		return nil, 0, err
+	if data, err := db.Get(uncleanShutdownKey); err == nil {
+		if err := rlp.DecodeBytes(data, &uncleanShutdowns); err != nil {
+			return nil, 0, err
+		}
 	}
 	var discarded = uncleanShutdowns.Discarded
 	var previous = make([]uint64, len(uncleanShutdowns.Recent))

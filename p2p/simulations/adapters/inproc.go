@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"sync"
@@ -147,7 +148,7 @@ func (s *SimAdapter) DialRPC(id enode.ID) (*rpc.Client, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown node: %s", id)
 	}
-	return node.node.Attach()
+	return node.node.Attach(), nil
 }
 
 // GetNode returns the node with the given ID if it exists
@@ -172,7 +173,7 @@ type SimNode struct {
 	registerOnce sync.Once
 }
 
-// Close closes the underlaying node.Node to release
+// Close closes the underlying node.Node to release
 // acquired resources.
 func (sn *SimNode) Close() error {
 	return sn.node.Close()
@@ -215,10 +216,7 @@ func (sn *SimNode) ServeRPC(conn *websocket.Conn) error {
 // simulation_snapshot RPC method
 func (sn *SimNode) Snapshots() (map[string][]byte, error) {
 	sn.lock.RLock()
-	services := make(map[string]node.Lifecycle, len(sn.running))
-	for name, service := range sn.running {
-		services[name] = service
-	}
+	services := maps.Clone(sn.running)
 	sn.lock.RUnlock()
 	if len(services) == 0 {
 		return nil, errors.New("no running services")
@@ -274,10 +272,7 @@ func (sn *SimNode) Start(snapshots map[string][]byte) error {
 	}
 
 	// create an in-process RPC client
-	client, err := sn.node.Attach()
-	if err != nil {
-		return err
-	}
+	client := sn.node.Attach()
 	sn.lock.Lock()
 	sn.client = client
 	sn.lock.Unlock()
@@ -318,11 +313,7 @@ func (sn *SimNode) Services() []node.Lifecycle {
 func (sn *SimNode) ServiceMap() map[string]node.Lifecycle {
 	sn.lock.RLock()
 	defer sn.lock.RUnlock()
-	services := make(map[string]node.Lifecycle, len(sn.running))
-	for name, service := range sn.running {
-		services[name] = service
-	}
-	return services
+	return maps.Clone(sn.running)
 }
 
 // Server returns the underlying p2p.Server
