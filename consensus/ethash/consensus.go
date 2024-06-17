@@ -244,83 +244,204 @@ func (ethash *Ethash) VerifyUncles(chain consensus.ChainReader, block *types.Blo
 // verifyHeader checks whether a header conforms to the consensus rules of the
 // stock Ethereum ethash engine.
 // See YP section 4.3.4. "Block Header Validity"
-func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, unixNow int64) error {
-	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
-	}
-	// Verify the header's timestamp
-	if !uncle {
-		if header.Time > uint64(unixNow+allowedFutureBlockTimeSeconds) {
-			return consensus.ErrFutureBlock
-		}
-	}
-	if header.Time <= parent.Time {
-		return errOlderBlockTime
-	}
-	// Verify the block's difficulty based on its timestamp and parent's difficulty
-	expected := ethash.CalcDifficulty(chain, header.Time, parent)
+// func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, unixNow int64) error {
+// 	// Ensure that the header's extra-data section is of a reasonable size
+// 	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
+// 		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+// 	}
+// 	// Verify the header's timestamp
+// 	if !uncle {
+// 		if header.Time > uint64(unixNow+allowedFutureBlockTimeSeconds) {
+// 			return consensus.ErrFutureBlock
+// 		}
+// 	}
+// 	if header.Time <= parent.Time {
+// 		return errOlderBlockTime
+// 	}
+// 	// Verify the block's difficulty based on its timestamp and parent's difficulty
+// 	expected := ethash.CalcDifficulty(chain, header.Time, parent)
 
-	if expected.Cmp(header.Difficulty) != 0 {
-		return fmt.Errorf("invalid difficulty: have %v, want %v", header.Difficulty, expected)
-	}
-	// Verify that the gas limit is <= 2^63-1
-	if header.GasLimit > params.MaxGasLimit {
-		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
-	}
-	// Verify that the gasUsed is <= gasLimit
-	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
-	}
-	// Verify the block's gas usage and (if applicable) verify the base fee.
-	if !chain.Config().IsLondon(header.Number) {
-		// Verify BaseFee not present before EIP-1559 fork.
-		if header.BaseFee != nil {
-			return fmt.Errorf("invalid baseFee before fork: have %d, expected 'nil'", header.BaseFee)
-		}
-		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
-			return err
-		}
-	} else if err := eip1559.VerifyEIP1559Header(chain.Config(), parent, header); err != nil {
-		// Verify the header's EIP-1559 attributes.
-		return err
-	}
-	// Verify that the block number is parent's +1
-	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
-		return consensus.ErrInvalidNumber
-	}
-	if chain.Config().IsShanghai(header.Number, header.Time) {
-		return errors.New("ethash does not support shanghai fork")
-	}
-	// Verify the non-existence of withdrawalsHash.
-	if header.WithdrawalsHash != nil {
-		return fmt.Errorf("invalid withdrawalsHash: have %x, expected nil", header.WithdrawalsHash)
-	}
-	if chain.Config().IsCancun(header.Number, header.Time) {
-		return errors.New("ethash does not support cancun fork")
-	}
-	// Verify the non-existence of cancun-specific header fields
-	switch {
-	case header.ExcessBlobGas != nil:
-		return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", header.ExcessBlobGas)
-	case header.BlobGasUsed != nil:
-		return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", header.BlobGasUsed)
-	case header.ParentBeaconRoot != nil:
-		return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", header.ParentBeaconRoot)
-	}
-	// Add some fake checks for tests
-	if ethash.fakeDelay != nil {
-		time.Sleep(*ethash.fakeDelay)
-	}
-	if ethash.fakeFail != nil && *ethash.fakeFail == header.Number.Uint64() {
-		return errors.New("invalid tester pow")
-	}
-	// If all checks passed, validate any special fields for hard forks
-	if err := misc.VerifyDAOHeaderExtraData(chain.Config(), header); err != nil {
-		return err
-	}
-	return nil
+// 	if expected.Cmp(header.Difficulty) != 0 {
+// 		return fmt.Errorf("invalid difficulty: have %v, want %v", header.Difficulty, expected)
+// 	}
+// 	// Verify that the gas limit is <= 2^63-1
+// 	if header.GasLimit > params.MaxGasLimit {
+// 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
+// 	}
+// 	// Verify that the gasUsed is <= gasLimit
+// 	if header.GasUsed > header.GasLimit {
+// 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
+// 	}
+// 	// Verify the block's gas usage and (if applicable) verify the base fee.
+// 	if !chain.Config().IsLondon(header.Number) {
+// 		// Verify BaseFee not present before EIP-1559 fork.
+// 		if header.BaseFee != nil {
+// 			return fmt.Errorf("invalid baseFee before fork: have %d, expected 'nil'", header.BaseFee)
+// 		}
+// 		if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
+// 			return err
+// 		}
+// 	} else if err := eip1559.VerifyEIP1559Header(chain.Config(), parent, header); err != nil {
+// 		// Verify the header's EIP-1559 attributes.
+// 		return err
+// 	}
+// 	// Verify that the block number is parent's +1
+// 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
+// 		return consensus.ErrInvalidNumber
+// 	}
+// 	if chain.Config().IsShanghai(header.Number, header.Time) {
+// 		return errors.New("ethash does not support shanghai fork")
+// 	}
+// 	// Verify the non-existence of withdrawalsHash.
+// 	if header.WithdrawalsHash != nil {
+// 		return fmt.Errorf("invalid withdrawalsHash: have %x, expected nil", header.WithdrawalsHash)
+// 	}
+// 	if chain.Config().IsCancun(header.Number, header.Time) {
+// 		return errors.New("ethash does not support cancun fork")
+// 	}
+// 	// Verify the non-existence of cancun-specific header fields
+// 	switch {
+// 	case header.ExcessBlobGas != nil:
+// 		return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", header.ExcessBlobGas)
+// 	case header.BlobGasUsed != nil:
+// 		return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", header.BlobGasUsed)
+// 	case header.ParentBeaconRoot != nil:
+// 		return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", header.ParentBeaconRoot)
+// 	}
+// 	// Add some fake checks for tests
+// 	if ethash.fakeDelay != nil {
+// 		time.Sleep(*ethash.fakeDelay)
+// 	}
+// 	if ethash.fakeFail != nil && *ethash.fakeFail == header.Number.Uint64() {
+// 		return errors.New("invalid tester pow")
+// 	}
+// 	// If all checks passed, validate any special fields for hard forks
+// 	if err := misc.VerifyDAOHeaderExtraData(chain.Config(), header); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
+
+func (ethash *Ethash) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, unixNow int64) error {
+    // Ensure that the header's extra-data section is of a reasonable size
+    if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
+        return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+    }
+    // Verify the header's timestamp
+    if !uncle {
+        if header.Time > uint64(unixNow+allowedFutureBlockTimeSeconds) {
+            return consensus.ErrFutureBlock
+        }
+    }
+    if header.Time <= parent.Time {
+        return errOlderBlockTime
+    }
+    // Verify the block's difficulty based on its timestamp and parent's difficulty
+    expected := ethash.CalcDifficulty(chain, header.Time, parent)
+    if expected.Cmp(header.Difficulty) != 0 {
+        return fmt.Errorf("invalid difficulty: have %v, want %v", header.Difficulty, expected)
+    }
+    // Verify that the gas limit is <= 2^63-1
+    if header.GasLimit > params.MaxGasLimit {
+        return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasLimit, params.MaxGasLimit)
+    }
+    // Verify that the gasUsed is <= gasLimit
+    if header.GasUsed > header.GasLimit {
+        return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
+    }
+    // Verify the block's gas usage and (if applicable) verify the base fee.
+    if !chain.Config().IsLondon(header.Number) {
+        // Verify BaseFee not present before EIP-1559 fork.
+        if header.BaseFee != nil {
+            return fmt.Errorf("invalid baseFee before fork: have %d, expected 'nil'", header.BaseFee)
+        }
+        if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
+            return err
+        }
+    } else if err := eip1559.VerifyEIP1559Header(chain.Config(), parent, header); err != nil {
+        // Verify the header's EIP-1559 attributes.
+        return err
+    }
+    // Verify that the block number is parent's +1
+    if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
+        return consensus.ErrInvalidNumber
+    }
+    if chain.Config().IsShanghai(header.Number, header.Time) {
+        return errors.New("ethash does not support shanghai fork")
+    }
+    // Verify the non-existence of withdrawalsHash.
+    if header.WithdrawalsHash != nil {
+        return fmt.Errorf("invalid withdrawalsHash: have %x, expected nil", header.WithdrawalsHash)
+    }
+    if chain.Config().IsCancun(header.Number, header.Time) {
+        return errors.New("ethash does not support cancun fork")
+    }
+    // Verify the non-existence of cancun-specific header fields
+    switch {
+    case header.ExcessBlobGas != nil:
+        return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", header.ExcessBlobGas)
+    case header.BlobGasUsed != nil:
+        return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", header.BlobGasUsed)
+    case header.ParentBeaconRoot != nil:
+        return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", header.ParentBeaconRoot)
+    }
+    // Add some fake checks for tests
+    if ethash.fakeDelay != nil {
+        time.Sleep(*ethash.fakeDelay)
+    }
+    if ethash.fakeFail != nil && *ethash.fakeFail == header.Number.Uint64() {
+        return errors.New("invalid tester pow")
+    }
+
+    // Get validator registry address from chain config
+    if chain.Config().ValidatorRegistryAddress == nil {
+        return errors.New("validator registry address not set in chain config")
+    }
+    validatorRegistryAddress := *chain.Config().ValidatorRegistryAddress
+
+    // Verify PoA signatures
+    stateDB := chain.StateAt(parent.Root)
+    if err := verifyPoASignatures(header, stateDB, validatorRegistryAddress); err != nil {
+        return err
+    }
+
+    // If all checks passed, validate any special fields for hard forks
+    if err := misc.VerifyDAOHeaderExtraData(chain.Config(), header); err != nil {
+        return err
+    }
+
+    return nil
 }
+
+
+func verifyPoASignatures(header *types.Header, stateDB *state.StateDB, validatorRegistryAddress common.Address) error {
+    validatorContract, err := NewValidatorRegistry(validatorRegistryAddress, stateDB)
+    if err != nil {
+        return fmt.Errorf("failed to load validator contract: %v", err)
+    }
+
+    // Check if the block signer is a registered validator
+    isValidator, err := validatorContract.IsValidator(nil, header.Coinbase)
+    if err != nil {
+        return fmt.Errorf("failed to check if address is validator: %v", err)
+    }
+    if !isValidator {
+        return fmt.Errorf("block signer is not a registered validator")
+    }
+
+    // Check if the validator has the required token balance
+    minTokensRequired := big.NewInt(50 * 1e18) // Set the required token amount here
+    balance, err := validatorContract.GetValidatorBalance(nil, header.Coinbase)
+    if err != nil {
+        return fmt.Errorf("failed to get validator token balance: %v", err)
+    }
+    if balance.Cmp(minTokensRequired) < 0 {
+        return fmt.Errorf("validator does not have the required token balance")
+    }
+
+    return nil
+}
+
 
 // CalcDifficulty is the difficulty adjustment algorithm. It returns
 // the difficulty that a new block should have when created at time
@@ -566,6 +687,7 @@ func (ethash *Ethash) FinalizeAndAssemble(chain consensus.ChainHeaderReader, hea
     // Header seems complete, assemble into a block and return
     return types.NewBlock(header, &types.Body{Transactions: body.Transactions, Uncles: body.Uncles}, receipts, trie.NewStackTrie(nil)), nil
 }
+
 
 
 // SealHash returns the hash of a block prior to it being sealed.
