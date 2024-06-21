@@ -36,6 +36,8 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
+	"github.com/ethereum/go-ethereum/ethash/validatorregistry"
+
 )
 
 // Ethash proof-of-work protocol constants.
@@ -738,29 +740,98 @@ var (
 // accumulateRewards credits the coinbase of the given block with the mining
 // reward. The total reward consists of the static block reward and rewards for
 // included uncles. The coinbase of each uncle block is also rewarded.
-func accumulateRewards(config *params.ChainConfig, stateDB *state.StateDB, header *types.Header, uncles []*types.Header) {
-	// Select the correct block reward based on chain progression
-	blockReward := FrontierBlockReward
-	if config.IsByzantium(header.Number) {
-		blockReward = ByzantiumBlockReward
-	}
-	if config.IsConstantinople(header.Number) {
-		blockReward = ConstantinopleBlockReward
-	}
-	// Accumulate the rewards for the miner and any included uncles
-	reward := new(uint256.Int).Set(blockReward)
-	r := new(uint256.Int)
-	hNum, _ := uint256.FromBig(header.Number)
-	for _, uncle := range uncles {
-		uNum, _ := uint256.FromBig(uncle.Number)
-		r.AddUint64(uNum, 8)
-		r.Sub(r, hNum)
-		r.Mul(r, blockReward)
-		r.Div(r, u256_8)
-		stateDB.AddBalance(uncle.Coinbase, r, tracing.BalanceIncreaseRewardMineUncle)
 
-		r.Div(blockReward, u256_32)
-		reward.Add(reward, r)
-	}
-	stateDB.AddBalance(header.Coinbase, reward, tracing.BalanceIncreaseRewardMineBlock)
+// func accumulateRewards(config *params.ChainConfig, stateDB *state.StateDB, header *types.Header, uncles []*types.Header) {
+// 	// Select the correct block reward based on chain progression
+// 	blockReward := FrontierBlockReward
+// 	if config.IsByzantium(header.Number) {
+// 		blockReward = ByzantiumBlockReward
+// 	}
+// 	if config.IsConstantinople(header.Number) {
+// 		blockReward = ConstantinopleBlockReward
+// 	}
+// 	// Accumulate the rewards for the miner and any included uncles
+// 	reward := new(uint256.Int).Set(blockReward)
+// 	r := new(uint256.Int)
+// 	hNum, _ := uint256.FromBig(header.Number)
+// 	for _, uncle := range uncles {
+// 		uNum, _ := uint256.FromBig(uncle.Number)
+// 		r.AddUint64(uNum, 8)
+// 		r.Sub(r, hNum)
+// 		r.Mul(r, blockReward)
+// 		r.Div(r, u256_8)
+// 		stateDB.AddBalance(uncle.Coinbase, r, tracing.BalanceIncreaseRewardMineUncle)
+
+// 		r.Div(blockReward, u256_32)
+// 		reward.Add(reward, r)
+// 	}
+// 	stateDB.AddBalance(header.Coinbase, reward, tracing.BalanceIncreaseRewardMineBlock)
+// }
+
+func accumulateRewards(config *params.ChainConfig, stateDB *state.StateDB, header *types.Header, uncles []*types.Header) {
+    // Select the correct block reward based on chain progression
+    blockReward := FrontierBlockReward
+    if config.IsByzantium(header.Number) {
+        blockReward = ByzantiumBlockReward
+    }
+    if config.IsConstantinople(header.Number) {
+        blockReward = ConstantinopleBlockReward
+    }
+
+    // Accumulate the rewards for the validator and any included uncles
+    reward := new(uint256.Int).Set(blockReward)
+    r := new(uint256.Int)
+    hNum, _ := uint256.FromBig(header.Number)
+    for _, uncle := range uncles {
+        uNum, _ := uint256.FromBig(uncle.Number)
+        r.AddUint64(uNum, 8)
+        r.Sub(r, hNum)
+        r.Mul(r, blockReward)
+        r.Div(r, u256_8)
+        stateDB.AddBalance(uncle.Coinbase, r, tracing.BalanceIncreaseRewardMineUncle)
+
+        r.Div(blockReward, u256_32)
+        reward.Add(reward, r)
+    }
+
+    // Add rewards to the block proposer
+    stateDB.AddBalance(header.Coinbase, reward, tracing.BalanceIncreaseRewardMineBlock)
+
+    // Added logic to distribute rewards among validators
+	err := distributeValidatorRewards(config, stateDB, header, reward)
+    if err != nil {
+        fmt.Errorf("failed to distribute validator rewards: %v", err)
+    }
+}
+
+func distributeValidatorRewards(config *params.ChainConfig, stateDB *state.StateDB, header *types.Header, totalReward *uint256.Int) error {
+    if config.ValidatorRegistryAddress == nil {
+        return fmt.Errorf("validator registry address not set in chain config")
+    }
+    validatorRegistryAddress := *config.ValidatorRegistryAddress
+
+    validatorContract, err := validatorregistry.NewValidatorRegistry(validatorRegistryAddress, stateDB)
+    if err != nil {
+        return fmt.Errorf("failed to load validator contract: %v", err)
+    }
+
+    validators, err := validatorContract.GetValidators(nil)
+    if err != nil {
+        return fmt.Errorf("failed to get validators: %v", err)
+    }
+
+    numValidators := len(validators)
+    if numValidators == 0 {
+        return fmt.Errorf("no validators are currently registered")
+    }
+
+    individualReward := new(uint256.Int).Div(totalReward, uint256.NewInt(uint64(numValidators)))
+    if individualReward.IsZero() {
+        return fmt.Errorf("reward to distribute per validator is zero")
+    }
+
+    for _, validator := range validators {
+        stateDB.AddBalance(validator, individualReward, tracing.BalanceIncreaseRewardMineBlock)
+    }
+    return nil
 }
