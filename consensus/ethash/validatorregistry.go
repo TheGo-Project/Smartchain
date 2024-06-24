@@ -3,10 +3,11 @@ package validatorregistry
 import (
     "errors"
     "math/big"
+    "strings"
+
     "github.com/ethereum/go-ethereum/accounts/abi"
     "github.com/ethereum/go-ethereum/common"
     "github.com/ethereum/go-ethereum/core/state"
-    "github.com/ethereum/go-ethereum/crypto"
     "github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -17,7 +18,7 @@ type ValidatorRegistry struct {
     stateDB *state.StateDB
 }
 
-// This NewValidatorRegistry creates a new instance of ValidatorRegistry
+// NewValidatorRegistry creates a new instance of ValidatorRegistry
 func NewValidatorRegistry(address common.Address, stateDB *state.StateDB) (*ValidatorRegistry, error) {
     parsedABI, err := abi.JSON(strings.NewReader(validatorRegistryABI))
     if err != nil {
@@ -64,6 +65,23 @@ func (vr *ValidatorRegistry) GetValidatorBalance(callOpts *rpc.CallOpts, validat
     return balance, err
 }
 
+// GetValidators retrieves the list of current validators
+func (vr *ValidatorRegistry) GetValidators(callOpts *rpc.CallOpts) ([]common.Address, error) {
+    data, err := vr.abi.Pack("getValidators")
+    if err != nil {
+        return nil, err
+    }
+
+    res, err := vr.callContract(callOpts, data)
+    if err != nil {
+        return nil, err
+    }
+
+    var validators []common.Address
+    err = vr.abi.UnpackIntoInterface(&validators, "getValidators", res)
+    return validators, err
+}
+
 // callContract simulates a call to the contract
 func (vr *ValidatorRegistry) callContract(callOpts *rpc.CallOpts, data []byte) ([]byte, error) {
     msg := ethereum.CallMsg{
@@ -74,4 +92,4 @@ func (vr *ValidatorRegistry) callContract(callOpts *rpc.CallOpts, data []byte) (
 }
 
 // validatorRegistryABI is the ABI of the ValidatorRegistry contract
-const validatorRegistryABI = `[{"constant":true,"inputs":[{"name":"validator","type":"address"}],"name":"isValidator","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"validator","type":"address"}],"name":"getValidatorBalance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"}]`
+const validatorRegistryABI = `[{"constant":true,"inputs":[{"name":"validator","type":"address"}],"name":"isValidator","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[{"name":"validator","type":"address"}],"name":"getValidatorBalance","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"getValidators","outputs":[{"name":"","type":"address[]"}],"payable":false,"stateMutability":"view","type":"function"}]`
